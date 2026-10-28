@@ -1106,7 +1106,14 @@ show_var_path(efi_load_option *load_option, size_t boot_data_size)
 			return;
 		}
 	}
-	printf("%s", text_path);
+	if (optional_data_len > 0 && text_path && text_path[0] != '\0') {
+		if (is_shim)
+			printf("%s", text_path);
+		else if (parser == parse_efi_guid)
+			printf(" %s", text_path);
+		else
+			printf(" Data{%s}", text_path);
+	}
 	free(text_path);
 	printf("\n");
 
