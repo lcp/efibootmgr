@@ -963,6 +963,40 @@ ucs2_to_utf8(const uint16_t * const chars, ssize_t limit)
 	return strdup(ret);
 }
 
+static bool
+is_shim_loader(const char *path)
+{
+	const char *base = path;
+	const char *p;
+	size_t len;
+
+	if (!path)
+		return false;
+
+	/* Find start of filename after the last directory separator */
+	for (p = path; *p; p++) {
+		if (*p == '/' || *p == '\\')
+			base = p + 1;
+	}
+
+	len = strlen(base);
+	/* Strip trailing ')' if formatted as File(...) */
+	if (len > 0 && base[len - 1] == ')')
+		len--;
+
+	/* Must begin with "shim" and end with ".efi" (case-insensitive) */
+	if (len < 8)
+		return false;
+
+	if (strncasecmp(base, "shim", 4) != 0)
+		return false;
+
+	if (strncasecmp(base + len - 4, ".efi", 4) != 0)
+		return false;
+
+	return true;
+}
+
 static void
 show_var_path(efi_load_option *load_option, size_t boot_data_size)
 {
@@ -974,9 +1008,6 @@ show_var_path(efi_load_option *load_option, size_t boot_data_size)
 	unsigned char *optional_data = NULL;
 	size_t optional_data_len=0;
 	bool is_shim = false;
-	const char * const shim_path_segments[] = {
-		"/File(\\EFI\\", "\\shim", ".efi)", NULL
-	};
 
 	pathlen = efi_loadopt_pathlen(load_option,
 				      boot_data_size);
@@ -1000,15 +1031,7 @@ show_var_path(efi_load_option *load_option, size_t boot_data_size)
 				      text_path_len, dp, pathlen);
 	if (rc >= 0) {
 		printf("\t%s", text_path);
-
-		char *a = text_path;
-		for (int i = 0; a && shim_path_segments[i] != NULL; i++) {
-			a = strstr(a, shim_path_segments[i]);
-			if (a)
-				a += strlen(shim_path_segments[i]);
-		}
-		if (a && a[0] == '\0')
-			is_shim = true;
+		is_shim = is_shim_loader(text_path);
 	}
 
 	free(text_path);
